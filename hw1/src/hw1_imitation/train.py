@@ -141,7 +141,7 @@ def run_training(config: TrainConfig) -> None:
     optimizer = torch.optim.Adam(params=model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
     
     
-    num_steps = 2000
+    num_steps = 10_000
     print(f"training for {num_steps} steps which is {num_steps*config.batch_size} datapoints, {(num_steps*config.batch_size)/len(dataset)} epochs")
     
     
@@ -149,18 +149,16 @@ def run_training(config: TrainConfig) -> None:
     losses = []
     pbar = tqdm(total=num_steps)
     while step < num_steps:
-        for batch_idx, (state, action_chunk) in enumerate(loader):
+        for state, action_chunk in loader:
             if step >= num_steps:
                 break
-            # state, action_chunk = dataset[0]
-            # state, action_chunk = state.unsqueeze(0), action_chunk.unsqueeze(0)
-            state, action_chunk = next(iter(DataLoader(
-        dataset,
-        batch_size=config.batch_size,
-        shuffle=False,
-        drop_last=True,
-    )))
-            print(state[0,0], action_chunk[0,0,0])
+            # state, action_chunk = next(iter(DataLoader(
+            #     dataset,
+            #     batch_size=config.batch_size,
+            #     shuffle=False,
+            #     drop_last=True,
+            # )))
+            # print(state[0,0], action_chunk[0,0,0])
             state, action_chunk = state.to(device), action_chunk.to(device)
             optimizer.zero_grad()
             loss = model.compute_loss(state, action_chunk)
@@ -170,11 +168,12 @@ def run_training(config: TrainConfig) -> None:
             losses.append(loss.item())
             pbar.update(1)
             pbar.set_postfix(loss=f"{losses[-1]:8.4f}")
+            pbar.set_postfix(epoch=f"{step//len(loader):8d}")
             print(loss.item())
 
-            # if step % 10000 == 0: # eval every 100 steps
-            #     evaluate_policy(model=model, normalizer=normalizer, device=device, chunk_size=config.chunk_size, video_size=config.video_size, num_video_episodes=config.num_video_episodes, flow_num_steps=config.flow_num_steps, step=step, logger=logger)
-            #     print(np.mean(losses[-10000:]))
+            if step % config.eval_interval == 0: # eval every 1000 steps
+                evaluate_policy(model=model, normalizer=normalizer, device=device, chunk_size=config.chunk_size, video_size=config.video_size, num_video_episodes=config.num_video_episodes, flow_num_steps=config.flow_num_steps, step=step, logger=logger)
+                print("trianing loss:", np.mean(losses[-config.eval_interval:]))
     pbar.close()
     
     import matplotlib.pyplot as plt
