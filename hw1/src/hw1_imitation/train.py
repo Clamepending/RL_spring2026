@@ -39,7 +39,7 @@ class TrainConfig:
 
     batch_size: int = 512 # changed from 128
     lr: float = 3e-4
-    weight_decay: float = 0.0
+    weight_decay: float = 0.00
     hidden_dims: tuple[int, ...] = (256, 256, 256)
     # The number of epochs to train for.
     num_epochs: int = 400
@@ -122,6 +122,7 @@ def run_training(config: TrainConfig) -> None:
         chunk_size=config.chunk_size,
         hidden_dims=config.hidden_dims,
     ).to(device)
+    print(f"model dims: f{model.hidden_dims}")
 
     exp_name = f"seed_{config.seed}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     if config.exp_name is not None:
@@ -133,14 +134,15 @@ def run_training(config: TrainConfig) -> None:
     logger = Logger(log_dir)
 
     ### TODO: PUT YOUR MAIN TRAINING LOOP HERE ###
-    model = torch.compile(model)
-    optimizer = torch.optim.Adam(params=model.parameters(), lr=1e-3, weight_decay=0.01)
-    num_steps = 100_000
-    print(f"training for {num_steps} steps which is {num_steps*config.batch_size} datapoints, {(num_steps*config.batch_size)/len(dataset)} epochs")
-    
     from evaluation import evaluate_policy
     import numpy as np
     from tqdm import tqdm
+    model = torch.compile(model)
+    optimizer = torch.optim.Adam(params=model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
+    
+    
+    num_steps = 2000
+    print(f"training for {num_steps} steps which is {num_steps*config.batch_size} datapoints, {(num_steps*config.batch_size)/len(dataset)} epochs")
     
     
     step = 0
@@ -150,6 +152,15 @@ def run_training(config: TrainConfig) -> None:
         for batch_idx, (state, action_chunk) in enumerate(loader):
             if step >= num_steps:
                 break
+            # state, action_chunk = dataset[0]
+            # state, action_chunk = state.unsqueeze(0), action_chunk.unsqueeze(0)
+            state, action_chunk = next(iter(DataLoader(
+        dataset,
+        batch_size=config.batch_size,
+        shuffle=False,
+        drop_last=True,
+    )))
+            print(state[0,0], action_chunk[0,0,0])
             state, action_chunk = state.to(device), action_chunk.to(device)
             optimizer.zero_grad()
             loss = model.compute_loss(state, action_chunk)
@@ -158,13 +169,21 @@ def run_training(config: TrainConfig) -> None:
             step += 1
             losses.append(loss.item())
             pbar.update(1)
-            pbar.set_postfix(batch_idx=batch_idx)
-            pbar.set_postfix(losses[-1])
+            pbar.set_postfix(loss=f"{losses[-1]:8.4f}")
+            print(loss.item())
 
-            if step % 10000 == 0: # eval every 100 steps
-                evaluate_policy(model=model, normalizer=normalizer, device=device, chunk_size=config.chunk_size, video_size=config.video_size, num_video_episodes=config.num_video_episodes, flow_num_steps=config.flow_num_steps, step=step, logger=logger)
-                print(np.mean(losses[-10000:]))
+            # if step % 10000 == 0: # eval every 100 steps
+            #     evaluate_policy(model=model, normalizer=normalizer, device=device, chunk_size=config.chunk_size, video_size=config.video_size, num_video_episodes=config.num_video_episodes, flow_num_steps=config.flow_num_steps, step=step, logger=logger)
+            #     print(np.mean(losses[-10000:]))
     pbar.close()
+    
+    import matplotlib.pyplot as plt
+    plt.figure()
+    plt.plot(losses)
+    plt.savefig("loss.png", dpi=300, bbox_inches="tight")
+    plt.close()
+    
+    
         
 
     logger.dump_for_grading()

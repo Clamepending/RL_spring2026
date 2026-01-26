@@ -47,6 +47,8 @@ class MSEPolicy(BasePolicy):
     ) -> None:
         super().__init__(state_dim, action_dim, chunk_size)
         
+        self.hidden_dims = hidden_dims
+        
         self.fc1 = nn.Linear(state_dim, hidden_dims[0])
         self.fc2 = nn.Linear(hidden_dims[0], hidden_dims[1])
         self.fc3 = nn.Linear(hidden_dims[1], chunk_size * action_dim) # reshape at end
