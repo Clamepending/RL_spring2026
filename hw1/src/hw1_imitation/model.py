@@ -48,7 +48,7 @@ class MSEPolicy(BasePolicy):
         super().__init__(state_dim, action_dim, chunk_size)
         
         self.fc1 = nn.Linear(state_dim, hidden_dims[0])
-        self.fc1 = nn.Linear(hidden_dims[0], hidden_dims[1])
+        self.fc2 = nn.Linear(hidden_dims[0], hidden_dims[1])
         self.fc3 = nn.Linear(hidden_dims[1], chunk_size * action_dim) # reshape at end
         self.relu = nn.ReLU()
 
@@ -59,7 +59,7 @@ class MSEPolicy(BasePolicy):
     ) -> torch.Tensor:
         
         actions = self.sample_actions(state)
-        loss = torch.nn.functional.mse_loss(actions - action_chunk)
+        loss = torch.nn.functional.mse_loss(actions, action_chunk)
         return loss
 
     def sample_actions(
@@ -69,13 +69,15 @@ class MSEPolicy(BasePolicy):
         num_steps: int = 10, # not needed
     ) -> torch.Tensor:
         
+        B, S = state.shape
+        
         x = self.fc1(state)
         x = self.relu(x)
         x = self.fc2(x)
-        x = self.relu()
+        x = self.relu(x)
         x = self.fc3(x)
         
-        return x.view(self.chunk_size, self.action_dim)
+        return x.view(B, self.chunk_size, self.action_dim)
 
 
 class FlowMatchingPolicy(BasePolicy):

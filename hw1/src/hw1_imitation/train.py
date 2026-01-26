@@ -37,7 +37,7 @@ class TrainConfig:
     # The action chunk size.
     chunk_size: int = 8
 
-    batch_size: int = 128
+    batch_size: int = 512 # changed from 128
     lr: float = 3e-4
     weight_decay: float = 0.0
     hidden_dims: tuple[int, ...] = (256, 256, 256)
@@ -88,7 +88,12 @@ def config_to_dict(config: TrainConfig) -> dict[str, Any]:
 
 def run_training(config: TrainConfig) -> None:
     set_seed(config.seed)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
     print(f"Using device: {device}")
 
     zarr_path = download_pusht(config.data_dir)
@@ -130,13 +135,36 @@ def run_training(config: TrainConfig) -> None:
     ### TODO: PUT YOUR MAIN TRAINING LOOP HERE ###
     model = torch.compile(model)
     optimizer = torch.optim.Adam(params=model.parameters(), lr=1e-3, weight_decay=0.01)
+    num_steps = 100_000
+    print(f"training for {num_steps} steps which is {num_steps*config.batch_size} datapoints, {(num_steps*config.batch_size)/len(dataset)} epochs")
     
-    for state, action_chunk in loader:
-        optimizer.zero_grad()
-        loss = model.compute_loss(state)
-        loss.backward()
-        optimizer.step()
-        
+    from evaluation import evaluate_policy
+    import numpy as np
+    from tqdm import tqdm
+    
+    
+    step = 0
+    losses = []
+    pbar = tqdm(total=num_steps)
+    while step < num_steps:
+        for batch_idx, (state, action_chunk) in enumerate(loader):
+            if step >= num_steps:
+                break
+            state, action_chunk = state.to(device), action_chunk.to(device)
+            optimizer.zero_grad()
+            loss = model.compute_loss(state, action_chunk)
+            loss.backward()
+            optimizer.step()
+            step += 1
+            losses.append(loss.item())
+            pbar.update(1)
+            pbar.set_postfix(batch_idx=batch_idx)
+            pbar.set_postfix(losses[-1])
+
+            if step % 10000 == 0: # eval every 100 steps
+                evaluate_policy(model=model, normalizer=normalizer, device=device, chunk_size=config.chunk_size, video_size=config.video_size, num_video_episodes=config.num_video_episodes, flow_num_steps=config.flow_num_steps, step=step, logger=logger)
+                print(np.mean(losses[-10000:]))
+    pbar.close()
         
 
     logger.dump_for_grading()
