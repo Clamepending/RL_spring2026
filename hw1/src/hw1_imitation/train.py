@@ -128,6 +128,16 @@ def run_training(config: TrainConfig) -> None:
     logger = Logger(log_dir)
 
     ### TODO: PUT YOUR MAIN TRAINING LOOP HERE ###
+    model = torch.compile(model)
+    optimizer = torch.optim.Adam(params=model.parameters(), lr=1e-3, weight_decay=0.01)
+    
+    for state, action_chunk in loader:
+        optimizer.zero_grad()
+        loss = model.compute_loss(state)
+        loss.backward()
+        optimizer.step()
+        
+        
 
     logger.dump_for_grading()
 
