@@ -44,7 +44,7 @@ class TrainConfig:
     # The number of epochs to train for.
     num_epochs: int = 400
     # How often to run evaluation, measured in training steps.
-    eval_interval: int = 10_000
+    eval_interval: int = 1_000
     num_video_episodes: int = 5
     video_size: tuple[int, int] = (256, 256)
     # How often to log training metrics, measured in training steps.
@@ -134,7 +134,7 @@ def run_training(config: TrainConfig) -> None:
     logger = Logger(log_dir)
 
     ### TODO: PUT YOUR MAIN TRAINING LOOP HERE ###
-    from evaluation import evaluate_policy
+    from evaluation import evaluate_policy, evaluate_reward
     import numpy as np
     from tqdm import tqdm
     model = torch.compile(model)
@@ -148,6 +148,7 @@ def run_training(config: TrainConfig) -> None:
     step = 0
     losses = []
     rewards = []
+    eval_steps = []
     pbar = tqdm(total=num_steps)
     while step < num_steps:
         for state, action_chunk in loader:
@@ -175,15 +176,26 @@ def run_training(config: TrainConfig) -> None:
             if step % config.eval_interval == 0: # eval every 1000 steps
                 evaluate_policy(model=model, normalizer=normalizer, device=device, chunk_size=config.chunk_size, video_size=config.video_size, num_video_episodes=config.num_video_episodes, flow_num_steps=config.flow_num_steps, step=step, logger=logger)
                 mean_training_loss = np.mean(losses[-config.eval_interval:])
-                print("trianing loss:", mean_training_loss)
-                
+                print("mean training loss:", mean_training_loss)
+                rewards.append(evaluate_reward(model=model, normalizer=normalizer, device=device, chunk_size=config.chunk_size, flow_num_steps=config.flow_num_steps, step=step, logger=logger))
+                eval_steps.append(step)
     pbar.close()
     
     import matplotlib.pyplot as plt
     plt.figure()
     plt.title("training loss vs steps")
+    plt.xlabel("Training Step")
+    plt.ylabel("Loss")
     plt.plot(losses)
-    plt.savefig("loss.png", dpi=300, bbox_inches="tight")
+    plt.savefig("stepvsloss.png", dpi=300, bbox_inches="tight")
+    plt.close()
+    
+    plt.figure()
+    plt.title("reward loss vs steps")
+    plt.xlabel("Training Step")
+    plt.ylabel("Reward")
+    plt.plot(eval_steps, rewards, marker="o")
+    plt.savefig("stepvsreward.png", dpi=300, bbox_inches="tight")
     plt.close()
     
     

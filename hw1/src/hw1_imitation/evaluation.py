@@ -215,3 +215,58 @@ def evaluate_policy(
         log_data[f"eval/rollout_ep{idx}"] = video
     logger.log(log_data, step=step)
     log_checkpoint_artifact(model, step=step)
+
+def evaluate_reward(
+    model: BasePolicy,
+    normalizer: Normalizer,
+    device: torch.device,
+    chunk_size: int,
+    flow_num_steps: int,
+    step: int,
+    logger: Logger,
+) -> None:
+    rewards: list[float] = []
+    
+    env = gym.make(ENV_ID, obs_type="state", render_mode="rgb_array")
+    action_low = env.action_space.low
+    action_high = env.action_space.high
+
+    for ep_idx in range(NUM_EVAL_EPISODES):
+        obs, _ = env.reset(seed=ep_idx)
+        done = False
+        chunk_index = chunk_size
+        action_chunk: np.ndarray | None = None
+        max_reward = 0.0
+
+        while not done:
+            if action_chunk is None or chunk_index >= chunk_size:
+                state = (
+                    torch.from_numpy(normalizer.normalize_state(obs)).float().to(device)
+                )
+                with torch.no_grad():
+                    pred_chunk = (
+                        model.sample_actions(
+                            state.unsqueeze(0), num_steps=flow_num_steps
+                        )
+                        .cpu()
+                        .numpy()[0]
+                    )
+                action_chunk = normalizer.denormalize_action(pred_chunk)
+                action_chunk = np.clip(action_chunk, action_low, action_high)
+                chunk_index = 0
+
+            action = action_chunk[chunk_index]
+            obs, reward, terminated, truncated, info = env.step(
+                action.astype(np.float32)
+            )
+            max_reward = max(max_reward, float(reward))
+            done = terminated or truncated
+            chunk_index += 1
+
+        rewards.append(max_reward)
+        
+
+    env.close()
+
+    return float(np.mean(rewards))
+    
