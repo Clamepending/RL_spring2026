@@ -147,6 +147,7 @@ def run_training(config: TrainConfig) -> None:
     
     step = 0
     losses = []
+    rewards = []
     pbar = tqdm(total=num_steps)
     while step < num_steps:
         for state, action_chunk in loader:
@@ -166,18 +167,21 @@ def run_training(config: TrainConfig) -> None:
             optimizer.step()
             step += 1
             losses.append(loss.item())
+            
             pbar.update(1)
             pbar.set_postfix(loss=f"{losses[-1]:8.4f}")
             pbar.set_postfix(epoch=f"{step//len(loader):8d}")
-            print(loss.item())
 
             if step % config.eval_interval == 0: # eval every 1000 steps
                 evaluate_policy(model=model, normalizer=normalizer, device=device, chunk_size=config.chunk_size, video_size=config.video_size, num_video_episodes=config.num_video_episodes, flow_num_steps=config.flow_num_steps, step=step, logger=logger)
-                print("trianing loss:", np.mean(losses[-config.eval_interval:]))
+                mean_training_loss = np.mean(losses[-config.eval_interval:])
+                print("trianing loss:", mean_training_loss)
+                
     pbar.close()
     
     import matplotlib.pyplot as plt
     plt.figure()
+    plt.title("training loss vs steps")
     plt.plot(losses)
     plt.savefig("loss.png", dpi=300, bbox_inches="tight")
     plt.close()
