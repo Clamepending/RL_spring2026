@@ -94,13 +94,45 @@ class FlowMatchingPolicy(BasePolicy):
         hidden_dims: tuple[int, ...] = (128, 128),
     ) -> None:
         super().__init__(state_dim, action_dim, chunk_size)
+        
+        self.hidden_dims = hidden_dims
+        self.action_dim = action_dim
+        self.chunk_size = chunk_size
+        
+        self.fc1 = nn.Linear(state_dim + chunk_size * action_dim + 1, hidden_dims[0])
+        self.fc2 = nn.Linear(hidden_dims[0], hidden_dims[1])
+        self.fc3 = nn.Linear(hidden_dims[1], chunk_size * action_dim) # reshape at end
+        self.relu = nn.ReLU()
 
     def compute_loss(
         self,
         state: torch.Tensor,
         action_chunk: torch.Tensor,
     ) -> torch.Tensor:
-        raise NotImplementedError
+        B, S = state.shape
+        noise = torch.randn(action_chunk.shape).to(action_chunk.device)
+        timestep = torch.rand(B).view(B, 1, 1).to(action_chunk.device)
+        noised_acitons = timestep * action_chunk + (1 - timestep) * noise
+        predicted_velocity = self.forward(state=state, action_chunk=noised_acitons, timestep=timestep)
+        return torch.nn.functional.mse_loss(predicted_velocity, action_chunk - noise)
+        
+    def forward(self,
+                state: torch.Tensor,
+                action_chunk: torch.Tensor,
+                timestep: torch.Tensor):
+        
+        B, S = state.shape
+        action_chunk = action_chunk.view(B, -1) # flatten the aciotn chunk
+        timestep = torch.tensor(timestep).view(B, -1) # unsqueeze time to be B by 1
+        input = torch.cat([state, action_chunk, timestep], dim=1) # cat all to be B by state_dim + aciton_dim * chunk_size + 1
+        x = self.fc1(input)
+        x = self.relu(x)
+        x = self.fc2(x)
+        x = self.relu(x)
+        x = self.fc3(x)
+        
+        return x.view(B, self.chunk_size, self.action_dim)
+        
 
     def sample_actions(
         self,
@@ -108,7 +140,14 @@ class FlowMatchingPolicy(BasePolicy):
         *,
         num_steps: int = 10,
     ) -> torch.Tensor:
-        raise NotImplementedError
+        
+        action_chunk = torch.randn(1, self.chunk_size, self.action_dim).to(state.device)
+        for i in range(num_steps):
+            pred_vel = self.forward(state=state, action_chunk=action_chunk, timestep=torch.Tensor([i/num_steps]).to(device=state.device))
+            action_chunk += pred_vel * 1/num_steps
+        return action_chunk
+            
+            
 
 
 PolicyType: TypeAlias = Literal["mse", "flow"]
