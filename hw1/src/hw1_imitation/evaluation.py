@@ -224,7 +224,7 @@ def evaluate_reward(
     flow_num_steps: int,
     step: int,
     logger: Logger,
-) -> None:
+) -> float:
     rewards: list[float] = []
     
     env = gym.make(ENV_ID, obs_type="state", render_mode="rgb_array")

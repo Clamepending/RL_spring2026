@@ -31,7 +31,7 @@ class TrainConfig:
     data_dir: Path = Path("data")
 
     # The policy type -- either MSE or flow.
-    policy_type: PolicyType = "flow" # "mse"
+    policy_type: PolicyType = "mse"
     # The number of denoising steps to use for the flow policy (has no effect for the MSE policy).
     flow_num_steps: int = 10
     # The action chunk size.
@@ -44,7 +44,7 @@ class TrainConfig:
     # The number of epochs to train for.
     num_epochs: int = 400
     # How often to run evaluation, measured in training steps.
-    eval_interval: int = 1_000
+    eval_interval: int = 20_000
     num_video_episodes: int = 5
     video_size: tuple[int, int] = (256, 256)
     # How often to log training metrics, measured in training steps.
@@ -137,11 +137,13 @@ def run_training(config: TrainConfig) -> None:
     from evaluation import evaluate_policy, evaluate_reward
     import numpy as np
     from tqdm import tqdm
+    from torch.optim.lr_scheduler import CosineAnnealingLR
     model = torch.compile(model)
-    optimizer = torch.optim.Adam(params=model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
+    optimizer = torch.optim.AdamW(params=model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
     
     
-    num_steps = 10_000
+    num_steps = 80_000
+    scheduler = CosineAnnealingLR(optimizer=optimizer, T_max=num_steps)
     print(f"training for {num_steps} steps which is {num_steps*config.batch_size} datapoints, {(num_steps*config.batch_size)/len(dataset)} epochs")
     
     
@@ -166,18 +168,20 @@ def run_training(config: TrainConfig) -> None:
             loss = model.compute_loss(state, action_chunk)
             loss.backward()
             optimizer.step()
+            scheduler.step()
             step += 1
             losses.append(loss.item())
             
             pbar.update(1)
-            pbar.set_postfix(loss=f"{losses[-1]:8.4f}")
-            pbar.set_postfix(epoch=f"{step//len(loader):8d}")
+            pbar.set_postfix(loss=f"{losses[-1]:8.4f}", epoch=f"{step//len(loader):8d}")
 
             if step % config.eval_interval == 0: # eval every 1000 steps
                 evaluate_policy(model=model, normalizer=normalizer, device=device, chunk_size=config.chunk_size, video_size=config.video_size, num_video_episodes=config.num_video_episodes, flow_num_steps=config.flow_num_steps, step=step, logger=logger)
                 mean_training_loss = np.mean(losses[-config.eval_interval:])
-                print("mean training loss:", mean_training_loss)
-                rewards.append(evaluate_reward(model=model, normalizer=normalizer, device=device, chunk_size=config.chunk_size, flow_num_steps=config.flow_num_steps, step=step, logger=logger))
+                
+                mean_reward = evaluate_reward(model=model, normalizer=normalizer, device=device, chunk_size=config.chunk_size, flow_num_steps=config.flow_num_steps, step=step, logger=logger)
+                print(f"mean training loss: {mean_training_loss} mean reward: {mean_reward}")
+                rewards.append(mean_reward)
                 eval_steps.append(step)
     pbar.close()
     
