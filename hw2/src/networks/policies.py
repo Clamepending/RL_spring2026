@@ -72,11 +72,10 @@ class MLPPolicy(nn.Module):
         """
         if self.discrete:
             # TODO: define the forward pass for a policy with a discrete action space.
-            pass
+            return self.logits_net(obs) # (B, H) -> (B, H, L)
         else:
             # TODO: define the forward pass for a policy with a continuous action space.
-            pass
-
+            return self.mean_net(obs), self.logstd(obs) # B H, B H
     def update(self, obs: np.ndarray, actions: np.ndarray, *args, **kwargs) -> dict:
         """
         Performs one iteration of gradient descent on the provided batch of data. You don't need to implement this
@@ -100,6 +99,23 @@ class MLPPolicyPG(MLPPolicy):
         advantages = ptu.from_numpy(advantages)
 
         # TODO: compute the policy gradient actor loss
+        if self.discrete:
+            # actions is B by H
+            # self.forward results in (B, H, L)
+            
+            
+            negative_likelihoods = F.cross_entropy(self.forward(obs), actions) # emits (B H)
+            weighted_likelihoods = negative_likelihoods * advantages # (B, H)
+            loss = torch.mean(weighted_likelihoods) # per step loss
+            
+            
+            # log_probs = torch.log(torch.gather(self.forward(obs), dim=-1, index=actions)) # results in B H
+            # log_probs_times_q = log_probs * advantages # (B, H) * (B, H) elementwise = (B, H)
+            # trajectory_wise_sum = torch.sum(log_probs_times_q, dim = -1) # (B, H) -> (B)
+            # loss = torch.mean(trajectory_wise_sum) # (B) -> 1
+        else:
+            # use torch.distributions.Normal and smaple then just call logprob to get logprob
+            
         loss = None
 
         # TODO: perform an optimizer step

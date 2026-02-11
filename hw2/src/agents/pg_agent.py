@@ -94,14 +94,24 @@ class PGAgent(nn.Module):
         Note that all entries of the output list should be the exact same because each sum is from 0 to T (and doesn't
         involve t)!
         """
-        return None
+        
+        running_count = 0
+        for i in reversed(range(len(rewards))):
+            running_count = running_count * self.gamma + rewards[i]
+        
+        
+        return [running_count] * len(rewards)
 
     def _discounted_reward_to_go(self, rewards: Sequence[float]) -> Sequence[float]:
         """
         Helper function which takes a list of rewards {r_0, r_1, ..., r_t', ... r_T} and returns a list where the entry
         in each index t' is sum_{t'=t}^T gamma^(t'-t) * r_{t'}.
         """
-        return None
+        
+        for i in reversed(range(len(rewards) - 1)):
+            rewards[i] += rewards[i + 1] * self.gamma
+        
+        return rewards
 
     def _calculate_q_vals(self, rewards: Sequence[np.ndarray]) -> Sequence[np.ndarray]:
         """Monte Carlo estimation of the Q function."""
@@ -111,12 +121,12 @@ class PGAgent(nn.Module):
             # trajectory at each point.
             # In other words: Q(s_t, a_t) = sum_{t'=0}^T gamma^t' r_{t'}
             # TODO: use the helper function self._discounted_return to calculate the Q-values
-            q_values = None
+            q_values = self._discounted_return(rewards)
         else:
             # Case 2: in reward-to-go PG, we only use the rewards after timestep t to estimate the Q-value for (s_t, a_t).
             # In other words: Q(s_t, a_t) = sum_{t'=t}^T gamma^(t'-t) * r_{t'}
             # TODO: use the helper function self._discounted_reward_to_go to calculate the Q-values
-            q_values = None
+            q_values = self._discounted_reward_to_go(rewards)
 
         return q_values
 
@@ -133,7 +143,7 @@ class PGAgent(nn.Module):
         """
         if self.critic is None:
             # TODO: if no baseline, then what are the advantages?
-            advantages = None
+            advantages = q_values
         else:
             # TODO: run the critic and use it as a baseline
             values = None
@@ -161,6 +171,8 @@ class PGAgent(nn.Module):
 
         # TODO: normalize the advantages to have a mean of zero and a standard deviation of one within the batch
         if self.normalize_advantages:
-            pass
+            mean = np.mean(advantages)
+            std = np.std(advantages - mean)
+            advantages = (advantages - mean)/(std + 1e-8)
 
         return advantages
