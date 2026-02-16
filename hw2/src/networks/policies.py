@@ -62,7 +62,7 @@ class MLPPolicy(nn.Module):
         # TODO: implement get_action
         if self.discrete:
             logits = self.forward(ptu.from_numpy(obs).unsqueeze(0)) # in: (1, obs) out: (1, 1, action_dim)
-            action = torch.multinomial(logits, num_samples=1) # out: (1, 1)
+            action = torch.multinomial(F.softmax(logits), num_samples=1) # out: (1, 1)
             return ptu.to_numpy(action).squeeze() # scalar numpy
         else:
             mean, std = self.forward(ptu.from_numpy(obs).unsqueeze(0)) # in: (1, obs) out: (1, aciton_dim), (action_dim)
@@ -77,7 +77,7 @@ class MLPPolicy(nn.Module):
         """
         if self.discrete:
             # TODO: define the forward pass for a policy with a discrete action space.
-            return torch.exp(self.logits_net(obs)) # (B, H) -> (B, H, L)
+            return self.logits_net(obs) # (B, H) -> (B, H, L)
         else:
             # TODO: define the forward pass for a policy with a continuous action space.
             return self.mean_net(obs), torch.exp(self.logstd) # (B, H, L), (L)

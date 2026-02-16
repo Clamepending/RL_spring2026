@@ -116,10 +116,11 @@ class PGAgent(nn.Module):
         in each index t' is sum_{t'=t}^T gamma^(t'-t) * r_{t'}.
         """
         
+        discounted_rewards = rewards.copy()
         for i in reversed(range(len(rewards) - 1)):
-            rewards[i] += rewards[i + 1] * self.gamma
+            discounted_rewards[i] += discounted_rewards[i + 1] * self.gamma
         
-        return rewards
+        return discounted_rewards
 
     def _calculate_q_vals(self, rewards: Sequence[np.ndarray]) -> Sequence[np.ndarray]:
         """Monte Carlo estimation of the Q function."""
