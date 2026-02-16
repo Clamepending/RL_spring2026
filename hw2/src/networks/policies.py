@@ -60,9 +60,14 @@ class MLPPolicy(nn.Module):
     def get_action(self, obs: np.ndarray) -> np.ndarray:
         """Takes a single observation (as a numpy array) and returns a single action (as a numpy array)."""
         # TODO: implement get_action
-        action = None
-
-        return action
+        if self.discrete:
+            logits = self.forward(ptu.from_numpy(obs).unsqueeze(0)) # in: (1, obs) out: (1, 1, action_dim)
+            action = torch.multinomial(logits, num_samples=1) # out: (1, 1)
+            return ptu.to_numpy(action).squeeze() # scalar numpy
+        else:
+            mean, std = self.forward(ptu.from_numpy(obs).unsqueeze(0)) # in: (1, obs) out: (1, aciton_dim), (action_dim)
+            action = torch.distributions.Normal(mean, std).sample()
+            return ptu.to_numpy(action)
 
     def forward(self, obs: torch.FloatTensor):
         """
@@ -72,10 +77,10 @@ class MLPPolicy(nn.Module):
         """
         if self.discrete:
             # TODO: define the forward pass for a policy with a discrete action space.
-            return self.logits_net(obs) # (B, H) -> (B, H, L)
+            return F.softmax(self.logits_net(obs), dim=-1) # (B, H) -> (B, H, L)
         else:
             # TODO: define the forward pass for a policy with a continuous action space.
-            return self.mean_net(obs), self.logstd(obs) # B H, B H
+            return self.mean_net(obs), torch.exp(self.logstd) # (B, H, L), (L)
     def update(self, obs: np.ndarray, actions: np.ndarray, *args, **kwargs) -> dict:
         """
         Performs one iteration of gradient descent on the provided batch of data. You don't need to implement this
@@ -104,22 +109,28 @@ class MLPPolicyPG(MLPPolicy):
             # self.forward results in (B, H, L)
             
             
-            negative_likelihoods = F.cross_entropy(self.forward(obs), actions) # emits (B H)
-            weighted_likelihoods = negative_likelihoods * advantages # (B, H)
-            loss = torch.mean(weighted_likelihoods) # per step loss
-            
-            
+            negative_likelihoods = F.cross_entropy(self.forward(obs), actions.long()) # emits (B*H)
+            weighted_likelihoods = negative_likelihoods * advantages # (B*H)
             # log_probs = torch.log(torch.gather(self.forward(obs), dim=-1, index=actions)) # results in B H
             # log_probs_times_q = log_probs * advantages # (B, H) * (B, H) elementwise = (B, H)
             # trajectory_wise_sum = torch.sum(log_probs_times_q, dim = -1) # (B, H) -> (B)
             # loss = torch.mean(trajectory_wise_sum) # (B) -> 1
         else:
             # use torch.distributions.Normal and smaple then just call logprob to get logprob
+            mean, std_vec = self.forward(obs) # (B * H, L) (L, L)
+            action_distributions = torch.distributions.Normal(mean, std_vec) # input: (B*H, L), (L)
+            log_probs = action_distributions.log_prob(actions).sum(dim=-1) # (B*H)
+            weighted_likelihoods = -log_probs * advantages # (B*H)
             
-        loss = None
+            
+        loss = torch.mean(weighted_likelihoods) # per step loss
+        
+        
 
         # TODO: perform an optimizer step
-        pass
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
 
         return {
             "Actor Loss": loss.item(),
