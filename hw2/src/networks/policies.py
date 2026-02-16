@@ -77,7 +77,7 @@ class MLPPolicy(nn.Module):
         """
         if self.discrete:
             # TODO: define the forward pass for a policy with a discrete action space.
-            return F.softmax(self.logits_net(obs), dim=-1) # (B, H) -> (B, H, L)
+            return torch.exp(self.logits_net(obs)) # (B, H) -> (B, H, L)
         else:
             # TODO: define the forward pass for a policy with a continuous action space.
             return self.mean_net(obs), torch.exp(self.logstd) # (B, H, L), (L)
@@ -109,7 +109,7 @@ class MLPPolicyPG(MLPPolicy):
             # self.forward results in (B, H, L)
             
             
-            negative_likelihoods = F.cross_entropy(self.forward(obs), actions.long()) # emits (B*H)
+            negative_likelihoods = F.cross_entropy(self.forward(obs), actions.long(), reduction='none') # emits (B*H)
             weighted_likelihoods = negative_likelihoods * advantages # (B*H)
             # log_probs = torch.log(torch.gather(self.forward(obs), dim=-1, index=actions)) # results in B H
             # log_probs_times_q = log_probs * advantages # (B, H) * (B, H) elementwise = (B, H)

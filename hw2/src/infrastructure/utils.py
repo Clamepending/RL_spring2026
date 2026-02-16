@@ -24,7 +24,11 @@ def sample_trajectory(
             if hasattr(env, "sim"):
                 img = env.sim.render(camera_name="track", height=500, width=500)[::-1]
             else:
-                img = env.render(mode="single_rgb_array")
+                # Support both gym 0.26+ (render_mode) and legacy (mode=) APIs
+                if getattr(env, "render_mode", None) == "rgb_array":
+                    img = env.render()
+                else:
+                    img = env.render(mode="single_rgb_array")
             image_obs.append(
                 cv2.resize(img, dsize=(250, 250), interpolation=cv2.INTER_CUBIC)
             )
@@ -37,7 +41,7 @@ def sample_trajectory(
 
         # TODO rollout can end due to done, or due to max_length
         steps += 1
-        rollout_done = done or (max_length >= steps)
+        rollout_done = done or (steps >= max_length)
 
         # record result of taking that action
         obs.append(ob)

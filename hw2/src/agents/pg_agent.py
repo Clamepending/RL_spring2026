@@ -72,6 +72,7 @@ class PGAgent(nn.Module):
         actions = np.concatenate(actions)
         rewards = np.concatenate(rewards)
         terminals = np.concatenate(terminals)
+        q_values = np.concatenate(q_values)
         
         
         
@@ -102,7 +103,6 @@ class PGAgent(nn.Module):
         Note that all entries of the output list should be the exact same because each sum is from 0 to T (and doesn't
         involve t)!
         """
-        
         running_count = 0
         for i in reversed(range(len(rewards))):
             running_count = running_count * self.gamma + rewards[i]
@@ -129,14 +129,14 @@ class PGAgent(nn.Module):
             # trajectory at each point.
             # In other words: Q(s_t, a_t) = sum_{t'=0}^T gamma^t' r_{t'}
             # TODO: use the helper function self._discounted_return to calculate the Q-values
-            q_values = self._discounted_return(rewards)
+            q_values = [np.array(self._discounted_return(single_traj_rewards)) for single_traj_rewards in rewards]
         else:
             # Case 2: in reward-to-go PG, we only use the rewards after timestep t to estimate the Q-value for (s_t, a_t).
             # In other words: Q(s_t, a_t) = sum_{t'=t}^T gamma^(t'-t) * r_{t'}
             # TODO: use the helper function self._discounted_reward_to_go to calculate the Q-values
-            q_values = self._discounted_reward_to_go(rewards)
+            q_values = [np.array(self._discounted_reward_to_go(single_traj_rewards)) for single_traj_rewards in rewards]
 
-        return np.array(q_values)
+        return q_values
 
     def _estimate_advantage(
         self,
