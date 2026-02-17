@@ -19,3 +19,13 @@ command line configuration:
 ./experiment1.sh
 ```
 
+## 4.2 questions
+
+I changed the bgs to 2 from 5 for the experiment. 
+a) The baseline learning curve is much more unstable (some spikes and a big uptrend towards the end) wiht only 2 steps. 
+b) The eval avg return also decreased a lot at the beginning (around 1000) most likely due to the high baseline loss. The avg eval return went down when the baseline learning curve went up at the end suggesting the baseline got worse and made the policy worse as a result.
+
+command line configuration:
+```bash
+./experiment1.sh
+```
