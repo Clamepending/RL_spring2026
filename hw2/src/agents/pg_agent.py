@@ -155,12 +155,12 @@ class PGAgent(nn.Module):
             advantages = q_values
         else:
             # TODO: run the critic and use it as a baseline
-            values = None
-            assert values.shape == q_values.shape
+            values = ptu.to_numpy(self.critic.forward(obs=ptu.from_numpy(obs)).squeeze())
+            assert values.shape == q_values.shape, f"Shape mismatch: {values.shape} vs {q_values.shape}"
 
             if self.gae_lambda is None:
                 # TODO: if using a baseline, but not GAE, what are the advantages?
-                advantages = None
+                advantages = q_values - values
             else:
                 # TODO: implement GAE
                 batch_size = obs.shape[0]
@@ -173,7 +173,11 @@ class PGAgent(nn.Module):
                     # TODO: recursively compute advantage estimates starting from timestep T.
                     # HINT: use terminals to handle edge cases. terminals[i] is 1 if the state is the last in its
                     # trajectory, and 0 otherwise.
-                    pass
+                    if terminals[i]:
+                        advantages[i] = rewards[i] - values[i]
+                    else:
+                        delta = rewards[i] + self.gamma * values[i + 1] - values[i]
+                        advantages[i] = self.gamma * self.gae_lambda * advantages[i+1] + delta
 
                 # remove dummy advantage
                 advantages = advantages[:-1]
@@ -181,7 +185,7 @@ class PGAgent(nn.Module):
         # TODO: normalize the advantages to have a mean of zero and a standard deviation of one within the batch
         if self.normalize_advantages:
             mean = np.mean(advantages)
-            std = np.std(advantages - mean)
+            std = np.std(advantages)
             advantages = (advantages - mean)/(std + 1e-8)
 
         return advantages

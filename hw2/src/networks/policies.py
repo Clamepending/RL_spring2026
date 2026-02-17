@@ -67,7 +67,7 @@ class MLPPolicy(nn.Module):
         else:
             mean, std = self.forward(ptu.from_numpy(obs).unsqueeze(0)) # in: (1, obs) out: (1, aciton_dim), (action_dim)
             action = torch.distributions.Normal(mean, std).sample()
-            return ptu.to_numpy(action)
+            return ptu.to_numpy(action).squeeze()
 
     def forward(self, obs: torch.FloatTensor):
         """
@@ -77,10 +77,10 @@ class MLPPolicy(nn.Module):
         """
         if self.discrete:
             # TODO: define the forward pass for a policy with a discrete action space.
-            return self.logits_net(obs) # (B, H) -> (B, H, L)
+            return self.logits_net(obs) # (B*H, obs) -> (B*H, L)
         else:
             # TODO: define the forward pass for a policy with a continuous action space.
-            return self.mean_net(obs), torch.exp(self.logstd) # (B, H, L), (L)
+            return self.mean_net(obs), torch.exp(self.logstd) # (B*H, L), (L)
     def update(self, obs: np.ndarray, actions: np.ndarray, *args, **kwargs) -> dict:
         """
         Performs one iteration of gradient descent on the provided batch of data. You don't need to implement this

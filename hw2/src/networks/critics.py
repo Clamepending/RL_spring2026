@@ -43,7 +43,7 @@ class ValueCritic(nn.Module):
         q_values = ptu.from_numpy(q_values)
 
         # TODO: compute the loss using the observations and q_values
-        loss = F.mse_loss(self.forward(obs), q_values)
+        loss = F.mse_loss(self.forward(obs).squeeze(), q_values)
 
         # TODO: perform an optimizer step
         self.optimizer.zero_grad()
