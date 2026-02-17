@@ -27,5 +27,19 @@ b) The eval avg return also decreased a lot at the beginning (around 1000) most 
 
 command line configuration:
 ```bash
-./experiment1.sh
+./experiment2.sh
+```
+
+
+# 5 questions
+
+What does λ = 0 correspond to?
+It corresponds to a temporal difference of 1 (having very low vairance with high bias)
+What about λ = 1? Relate this to the task
+performance in LunarLander-v2 in one or two sentences.
+It correspods to a monte carlo rollouts were variance is big but bias is low.
+• Provide the exact command line configurations you used to run your experiments, including any parameters changed from defaults.
+command line configuration:
+```bash
+./experiment3.sh
 ```

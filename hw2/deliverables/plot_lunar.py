@@ -1,9 +1,7 @@
 """
-Plot learning curves for CartPole small-batch and large-batch experiments.
+Plot learning curves for LunarLander-v2 GAE-λ experiments (Experiment 3).
 
-Produces two figures:
-  1. Small batch (b=1000): cartpole, cartpole_rtg, cartpole_na, cartpole_rtg_na
-  2. Large batch (b=4000): cartpole_lb, cartpole_lb_rtg, cartpole_lb_na, cartpole_lb_rtg_na
+Produces one figure with eval average return for each λ value.
 
 X-axis: Train_EnvstepsSoFar (number of environment steps)
 Y-axis: Eval_AverageReturn
@@ -18,11 +16,12 @@ import pandas as pd
 
 EXP_DIR = Path(__file__).resolve().parent.parent / "exp"
 
-SMALL_BATCH_NAMES = ["cartpole", "cartpole_rtg", "cartpole_na", "cartpole_rtg_na"]
-LARGE_BATCH_NAMES = ["cartpole_lb", "cartpole_lb_rtg", "cartpole_lb_na", "cartpole_lb_rtg_na"]
+LAMBDAS = [0, 0.95, 0.98, 0.99, 1]
+EXP_NAMES = [f"lunar_lander_lambda{lam}" for lam in LAMBDAS]
 
-# Pattern: CartPole-v0_{exp_name}_sd{seed}_{timestamp}
-DIR_PATTERN = re.compile(r"^CartPole-v0_(.+)_sd(\d+)_(\d{8}_\d{6})$")
+DIR_PATTERN = re.compile(r"^LunarLander-v2_(.+)_sd(\d+)_(\d{8}_\d{6})$")
+
+LABEL_MAP = {f"lunar_lander_lambda{lam}": f"λ = {lam}" for lam in LAMBDAS}
 
 
 def find_latest_runs(exp_dir: Path) -> dict[str, Path]:
@@ -49,15 +48,14 @@ def load_data(run_dir: Path) -> pd.DataFrame:
     return pd.read_csv(csv_path)
 
 
-def make_plot(
-    exp_names: list[str],
+def plot_eval_return(
     latest_runs: dict[str, Path],
-    title: str,
     save_path: Path,
 ):
-    fig, ax = plt.subplots(figsize=(8, 5))
+    """Plot eval average return for all λ values on a single figure."""
+    fig, ax = plt.subplots(figsize=(9, 5))
 
-    for name in exp_names:
+    for name in EXP_NAMES:
         if name not in latest_runs:
             print(f"Warning: no run found for '{name}', skipping.")
             continue
@@ -65,13 +63,13 @@ def make_plot(
         ax.plot(
             df["Train_EnvstepsSoFar"],
             df["Eval_AverageReturn"],
-            label=name,
+            label=LABEL_MAP.get(name, name),
         )
 
-    ax.axhline(y=200, color="gray", linestyle="--", linewidth=1, label="Target (200)")
-    ax.set_xlabel("Environment Steps (Train_EnvstepsSoFar)")
-    ax.set_ylabel("Average Return (Eval_AverageReturn)")
-    ax.set_title(title)
+    ax.axhline(y=150, color="gray", linestyle="--", linewidth=1, label="Target (150)")
+    ax.set_xlabel("Environment Steps")
+    ax.set_ylabel("Average Return (Eval)")
+    ax.set_title("LunarLander-v2 — GAE-λ Comparison")
     ax.legend()
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
@@ -99,27 +97,21 @@ def save_logs(
 def main():
     latest_runs = find_latest_runs(EXP_DIR)
 
-    print("Latest runs found:")
-    for name, path in sorted(latest_runs.items()):
-        print(f"  {name}: {path.name}")
+    print("Latest LunarLander runs found:")
+    for name in EXP_NAMES:
+        if name in latest_runs:
+            print(f"  {name}: {latest_runs[name].name}")
+        else:
+            print(f"  {name}: NOT FOUND")
 
     out_dir = Path(__file__).resolve().parent
     log_dir = out_dir / "logs"
 
-    all_names = SMALL_BATCH_NAMES + LARGE_BATCH_NAMES
-    save_logs(all_names, latest_runs, log_dir)
+    save_logs(EXP_NAMES, latest_runs, log_dir)
 
-    make_plot(
-        SMALL_BATCH_NAMES,
+    plot_eval_return(
         latest_runs,
-        title="CartPole — Small Batch (b=1000)",
-        save_path=out_dir / "cartpole_small_batch.png",
-    )
-    make_plot(
-        LARGE_BATCH_NAMES,
-        latest_runs,
-        title="CartPole — Large Batch (b=4000)",
-        save_path=out_dir / "cartpole_large_batch.png",
+        save_path=out_dir / "lunar_lander_gae_lambda.png",
     )
 
 

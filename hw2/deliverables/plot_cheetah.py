@@ -9,6 +9,7 @@ X-axis: Train_EnvstepsSoFar (number of environment steps)
 """
 
 import re
+import shutil
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -102,6 +103,7 @@ def plot_eval_return(
             label=LABEL_MAP.get(name, name),
         )
 
+    ax.axhline(y=300, color="gray", linestyle="--", linewidth=1, label="Target (300)")
     ax.set_xlabel("Environment Steps")
     ax.set_ylabel("Average Return (Eval)")
     ax.set_title("HalfCheetah — Eval Return")
@@ -111,6 +113,22 @@ def plot_eval_return(
     fig.savefig(save_path, dpi=150)
     print(f"Saved: {save_path}")
     plt.close(fig)
+
+
+def save_logs(
+    exp_names: list[str],
+    latest_runs: dict[str, Path],
+    log_dir: Path,
+):
+    """Copy log.csv files for the given experiments into log_dir, renamed by exp_name."""
+    log_dir.mkdir(parents=True, exist_ok=True)
+    for name in exp_names:
+        if name not in latest_runs:
+            continue
+        src = latest_runs[name] / "log.csv"
+        dst = log_dir / f"{name}.csv"
+        shutil.copy2(src, dst)
+        print(f"  Copied log: {dst}")
 
 
 def main():
@@ -124,6 +142,9 @@ def main():
             print(f"  {name}: NOT FOUND")
 
     out_dir = Path(__file__).resolve().parent
+    log_dir = out_dir / "logs"
+
+    save_logs(EXP_NAMES, latest_runs, log_dir)
 
     plot_baseline_loss(
         latest_runs,
