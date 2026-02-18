@@ -65,9 +65,12 @@ class MLPPolicy(nn.Module):
             action = torch.multinomial(F.softmax(logits), num_samples=1) # out: (1, 1)
             return ptu.to_numpy(action).squeeze() # scalar numpy
         else:
+            # print(f"before network {ptu.from_numpy(obs).unsqueeze(0).shape}")
             mean, std = self.forward(ptu.from_numpy(obs).unsqueeze(0)) # in: (1, obs) out: (1, aciton_dim), (action_dim)
+            # print(f"mean and std {mean.shape} {std.shape}")
             action = torch.distributions.Normal(mean, std).sample()
-            return ptu.to_numpy(action).squeeze()
+            # print(f"aciotn dim {action.squeeze(0).shape}")
+            return ptu.to_numpy(action.squeeze(0))
 
     def forward(self, obs: torch.FloatTensor):
         """

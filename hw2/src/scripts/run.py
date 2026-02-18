@@ -143,6 +143,7 @@ def setup_arguments(args=None):
     parser.add_argument("--which_gpu", "-gpu_id", default=0)
     parser.add_argument("--video_log_freq", type=int, default=-1)
     parser.add_argument("--scalar_log_freq", type=int, default=1)
+    parser.add_argument("--group", type=str, default=None)
 
     args = parser.parse_args(args=args)
 
@@ -156,7 +157,7 @@ def main(args):
     exp_name = f"{args.env_name}_{args.exp_name}_sd{args.seed}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
     config = vars(args)
-    setup_wandb(project='cs285_hw2', name=exp_name, config=config)
+    setup_wandb(project='cs285_hw2', name=exp_name, group=args.group, config=config)
     args.save_dir = os.path.join(logdir_prefix, exp_name)
     os.makedirs(args.save_dir, exist_ok=True)
     logger = Logger(os.path.join(args.save_dir, 'log.csv'))
