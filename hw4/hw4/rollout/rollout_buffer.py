@@ -59,6 +59,7 @@ def iter_minibatches(
         end_of_minibatch = min(N, start_of_minibatch + minibatch_size)
         indices = shuffled_indices[start_of_minibatch:end_of_minibatch]
         
+        idx_list = indices.tolist()
         new_minibatch = RolloutBatch(
             input_ids=batch.input_ids[indices],
             attention_mask=batch.attention_mask[indices],
@@ -67,9 +68,9 @@ def iter_minibatches(
             ref_logprobs=batch.ref_logprobs[indices],
             rewards=batch.rewards[indices],
             advantages=batch.advantages[indices],
-            task_names=[batch.task_names[i] for i in indices.tolist()],
-            completion_texts=[batch.completion_texts[i] for i in indices.tolist()]
+            task_names=[batch.task_names[i] for i in idx_list] if batch.task_names is not None else None,
+            completion_texts=[batch.completion_texts[i] for i in idx_list] if batch.completion_texts is not None else None,
         )
-        if device:
+        if device is not None:
             new_minibatch = new_minibatch.to(device)
         yield new_minibatch
