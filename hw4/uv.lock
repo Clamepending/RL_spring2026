@@ -222,6 +222,7 @@ source = { editable = "." }
 dependencies = [
     { name = "matplotlib" },
     { name = "modal" },
+    { name = "wandb" },
 ]
 
 [package.optional-dependencies]
@@ -245,6 +246,7 @@ requires-dist = [
     { name = "torch", marker = "extra == 'remote'", specifier = ">=2.5,<2.7" },
     { name = "tqdm", marker = "extra == 'remote'", specifier = ">=4.66.0" },
     { name = "transformers", marker = "extra == 'remote'", specifier = ">=4.45.0,<4.57.0" },
+    { name = "wandb", specifier = ">=0.25.0" },
     { name = "wandb", marker = "extra == 'remote'", specifier = ">=0.16.0" },
 ]
 provides-extras = ["remote"]
