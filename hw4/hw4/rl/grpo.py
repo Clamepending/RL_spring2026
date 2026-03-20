@@ -104,15 +104,14 @@ class GRPO(RLAlgorithm):
                 unclipped_ratio = torch.exp(log_importance_sampling_ratio)
                 clipped_ratio = unclipped_ratio.clamp(min=1 - cfg.clip_eps, max=1 + cfg.clip_eps)
                 adv = adv.unsqueeze(1)
-                unclipped_advantage = unclipped_ratio * adv
-                clipped_advantage = clipped_ratio * adv
-                clipped_likelihood_advantage = torch.minimum(unclipped_advantage, clipped_advantage) * mask # (B_mb, L-1)
+                clipped_likelihood_advantage = torch.minimum(unclipped_ratio * adv, clipped_ratio * adv) * mask
                 pg_loss = -masked_mean_per_row(clipped_likelihood_advantage, mask).mean()
                 
                 # compute kl and entropy
                 kl = approx_kl_from_logprobs(new_logp, mb.ref_logprobs, mask)
                 entropy = -masked_mean(new_logp, mask)
-                clipfrac = (unclipped_ratio * adv > clipped_ratio * adv).float().mean() # count fraciton of advantages clipped
+                clipped = (unclipped_ratio < (1 - cfg.clip_eps)) | (unclipped_ratio > (1 + cfg.clip_eps))
+                clipfrac = masked_mean(clipped.float(), mask)
 
                 loss = (pg_loss + cfg.kl_coef * kl) / max(1, grad_accum_steps)
                 if not torch.isfinite(loss):

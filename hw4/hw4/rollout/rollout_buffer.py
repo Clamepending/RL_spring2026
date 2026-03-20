@@ -53,7 +53,7 @@ def iter_minibatches(
     if shuffle:
         shuffled_indices = torch.randperm(N, generator=generator)
     else:
-        shuffled_indices = torch.arange(N, device=batch.input_ids.device)
+        shuffled_indices = torch.arange(N)
         
     for start_of_minibatch in range(0, N, minibatch_size):
         end_of_minibatch = min(N, start_of_minibatch + minibatch_size)
@@ -70,5 +70,7 @@ def iter_minibatches(
             advantages=batch.advantages[indices],
             task_names=[batch.task_names[i] for i in idx_list] if batch.task_names is not None else None,
             completion_texts=[batch.completion_texts[i] for i in idx_list] if batch.completion_texts is not None else None,
-        ).to(device)
+        )
+        if device is not None:
+            new_minibatch = new_minibatch.to(device)
         yield new_minibatch
