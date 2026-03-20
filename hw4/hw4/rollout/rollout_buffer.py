@@ -53,11 +53,11 @@ def iter_minibatches(
     if shuffle:
         shuffled_indices = torch.randperm(N, generator=generator)
     else:
-        shuffled_indices = torch.arange(N, device)
+        shuffled_indices = torch.arange(N)
         
     for start_of_minibatch in range(0, N, minibatch_size):
         end_of_minibatch = min(N, start_of_minibatch + minibatch_size)
-        indices = shuffled_indices[start_of_minibatch, end_of_minibatch]
+        indices = shuffled_indices[start_of_minibatch:end_of_minibatch]
         
         new_minibatch = RolloutBatch(
             input_ids=batch.input_ids[indices],
@@ -67,7 +67,9 @@ def iter_minibatches(
             ref_logprobs=batch.ref_logprobs[indices],
             rewards=batch.rewards[indices],
             advantages=batch.advantages[indices],
-            task_names=batch.task_names[indices],
-            completion_texts=batch.completion_texts[indices],
-        ).to(device)
+            task_names=[batch.task_names[i] for i in indices.tolist()],
+            completion_texts=[batch.completion_texts[i] for i in indices.tolist()]
+        )
+        if device:
+            new_minibatch = new_minibatch.to(device)
         yield new_minibatch
