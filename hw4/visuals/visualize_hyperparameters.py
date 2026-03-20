@@ -6,6 +6,10 @@ import re
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import matplotlib.lines as mlines
+
+LINESTYLES = ["-", "--", "-.", ":"]
+MARKERS = ["o", "s", "^", "D", "v", "P", "X", "*", "h", "p", "d", "<", ">"]
 
 METRICS = [
     ("eval/format_copy_fraction_predicted_number_matches_target_integer_exactly", "Eval Exact Match"),
@@ -75,21 +79,51 @@ def main():
             by_param.setdefault(p, {})[data["value"]] = data
 
     for param, value_data in by_param.items():
-        fig, axes = plt.subplots(5, 1, figsize=(10, 12), sharex=True)
+        sorted_vals = sorted(value_data.items())
+        n_vals = len(sorted_vals)
+        cmap = plt.cm.get_cmap("tab20", max(n_vals, 2))
+
+        style_map = {}
+        for i, (val, _) in enumerate(sorted_vals):
+            style_map[val] = dict(
+                color=cmap(i),
+                linestyle=LINESTYLES[i % len(LINESTYLES)],
+                marker=MARKERS[i % len(MARKERS)],
+                markersize=4,
+                markevery=max(1, 5 - n_vals // 5),
+                linewidth=1.6,
+            )
+
+        fig, axes = plt.subplots(5, 1, figsize=(10, 14), sharex=True)
         for ax, (metric_key, label) in zip(axes, METRICS):
-            for i, (val, data) in enumerate(sorted(value_data.items())):
+            for val, data in sorted_vals:
                 x, y = get_xy(data, metric_key)
                 if x:
-                    ax.plot(x, y, label=val)
+                    ax.plot(x, y, **style_map[val])
             ax.set_ylabel(label)
-            ax.legend()
             ax.grid(alpha=0.3)
             ax.set_ylim(bottom=0)
+            ymin, ymax = ax.get_ylim()
+            margin = (ymax - ymin) * 0.08 or 0.05
+            ax.set_ylim(ymin - margin, ymax + margin)
+
+        handles = [
+            mlines.Line2D([], [], label=val, **style_map[val])
+            for val, _ in sorted_vals
+        ]
+        fig.legend(
+            handles=handles,
+            loc="upper center",
+            ncol=min(n_vals, 6),
+            fontsize="small",
+            bbox_to_anchor=(0.5, 1.0),
+            frameon=True,
+        )
         axes[-1].set_xlabel("Step")
-        plt.suptitle(f"GRPO: {param.replace('_', ' ').title()}")
-        plt.tight_layout()
-        plt.savefig(out_dir / f"grpo_{param}.png", dpi=150, bbox_inches="tight")
-        plt.close()
+        fig.suptitle(f"GRPO: {param.replace('_', ' ').title()}", y=1.04, fontsize=14)
+        fig.tight_layout(rect=[0, 0, 1, 0.97])
+        fig.savefig(out_dir / f"grpo_{param}.png", dpi=150, bbox_inches="tight")
+        plt.close(fig)
         print(f"Saved: grpo_{param}.png")
 
 
